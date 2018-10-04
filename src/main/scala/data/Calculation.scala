@@ -4,30 +4,21 @@ import scala.util.Try
 
 sealed trait Calculation[A] {
   def eval()(implicit n: Fractional[A]): Either[String, A] = {
-    def applyOp(a: A, b: A, op: (A, A) => A) = op(a, b)
+    def applyOp(a: Calculation[A], b: Calculation[A], op: (A, A) => A) = for {
+      r1 <- a.eval()
+      r2 <- b.eval()
+    } yield op(r1, r2)
 
     this match {
-      case Add(a, b) => for {
-        r1 <- a.eval()
-        r2 <- b.eval()
-      } yield applyOp(r1, r2, n.plus)
-      case Subtract(a, b) => for {
-        r1 <- a.eval()
-        r2 <- b.eval()
-      } yield applyOp(r1, r2, n.minus)
-      case Multiply(a, b) => for {
-        r1 <- a.eval()
-        r2 <- b.eval()
-      } yield applyOp(r1, r2, n.times)
+      case Add(a, b) => applyOp(a, b, n.plus)
+      case Subtract(a, b) => applyOp(a, b, n.minus)
+      case Multiply(a, b) => applyOp(a, b, n.times)
       case Divide(a, b) =>
         val bEvaluated = b.eval()
 
         if(bEvaluated.exists(v => n.equiv(n.zero, v)))
           Left("Division by zero!")
-        else for {
-          r1 <- a.eval()
-          r2 <- bEvaluated
-        } yield applyOp(r1, r2, n.div)
+        else applyOp(a, b, n.div)
       case Self(v) => Right(v)
     }
   }
